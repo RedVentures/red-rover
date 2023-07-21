@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: RedVentures/red-rover@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB__TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
