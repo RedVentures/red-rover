@@ -64,9 +64,9 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: bankrate/red-rover@main
+      - uses: RedVentures/red-rover@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_ACTION_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB__TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
