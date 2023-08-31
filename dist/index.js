@@ -3505,7 +3505,10 @@ class Bot {
             const currentDate = new Date().toISOString().split('T')[0];
             const systemMessage = `${options.systemMessage} 
 Knowledge cutoff: ${openaiOptions.tokenLimits.knowledgeCutOff}
-Current date: ${currentDate}`;
+Current date: ${currentDate}
+
+IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
+`;
             this.api = new ChatGPTAPI({
                 apiBaseUrl: options.apiBaseUrl,
                 systemMessage,
@@ -3608,7 +3611,7 @@ Current date: ${currentDate}`;
 /* harmony export */   "oi": () => (/* binding */ RAW_SUMMARY_START_TAG),
 /* harmony export */   "rV": () => (/* binding */ RAW_SUMMARY_END_TAG)
 /* harmony export */ });
-/* unused harmony exports COMMENT_GREETING, DESCRIPTION_START_TAG, DESCRIPTION_END_TAG, COMMIT_ID_START_TAG, COMMIT_ID_END_TAG */
+/* unused harmony exports COMMENT_GREETING, IN_PROGRESS_START_TAG, IN_PROGRESS_END_TAG, DESCRIPTION_START_TAG, DESCRIPTION_END_TAG, COMMIT_ID_START_TAG, COMMIT_ID_END_TAG */
 /* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(2186);
 /* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__nccwpck_require__.n(_actions_core__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5438);
@@ -3625,19 +3628,17 @@ const COMMENT_GREETING = ':dog: RedRover';
 const COMMENT_TAG = '<!-- This is an auto-generated comment by RedRover -->';
 const COMMENT_REPLY_TAG = '<!-- This is an auto-generated reply by RedRover -->';
 const SUMMARIZE_TAG = '<!-- This is an auto-generated comment: summarize by RedRover -->';
+const IN_PROGRESS_START_TAG = '<!-- This is an auto-generated comment: summarize review in progress by RedRover -->';
+const IN_PROGRESS_END_TAG = '<!-- end of auto-generated comment: summarize review in progress by RedRover -->';
 const DESCRIPTION_START_TAG = `
 <!-- This is an auto-generated comment: release notes by RedRover -->`;
 const DESCRIPTION_END_TAG = '<!-- end of auto-generated comment: release notes by RedRover -->';
-const RAW_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: raw summary by RedRover -->
-<!--
+const RAW_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: raw summary by RedRover --><!--
 `;
-const RAW_SUMMARY_END_TAG = `-->
-<!-- end of auto-generated comment: raw summary by RedRover -->`;
-const SHORT_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: short summary by RedRover -->
-<!--
+const RAW_SUMMARY_END_TAG = `--><!-- end of auto-generated comment: raw summary by RedRover -->`;
+const SHORT_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: short summary by RedRover --><!--
 `;
-const SHORT_SUMMARY_END_TAG = `-->
-<!-- end of auto-generated comment: short summary by RedRover -->`;
+const SHORT_SUMMARY_END_TAG = `--><!-- end of auto-generated comment: short summary by RedRover -->`;
 const COMMIT_ID_START_TAG = '<!-- commit_ids_reviewed_start -->';
 const COMMIT_ID_END_TAG = '<!-- commit_ids_reviewed_end -->';
 class Commenter {
@@ -3748,33 +3749,122 @@ ${COMMENT_TAG}`;
             message
         });
     }
-    async submitReview(pullNumber, commitId) {
-        (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Submitting review for PR #${pullNumber}, total comments: ${this.reviewCommentsBuffer.length}`);
-        let commentCounter = 0;
+    async deletePendingReview(pullNumber) {
+        try {
+            const reviews = await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.listReviews */ .K.pulls.listReviews({
+                owner: repo.owner,
+                repo: repo.repo,
+                // eslint-disable-next-line camelcase
+                pull_number: pullNumber
+            });
+            const pendingReview = reviews.data.find(review => review.state === 'PENDING');
+            if (pendingReview) {
+                (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Deleting pending review for PR #${pullNumber} id: ${pendingReview.id}`);
+                try {
+                    await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.deletePendingReview */ .K.pulls.deletePendingReview({
+                        owner: repo.owner,
+                        repo: repo.repo,
+                        // eslint-disable-next-line camelcase
+                        pull_number: pullNumber,
+                        // eslint-disable-next-line camelcase
+                        review_id: pendingReview.id
+                    });
+                }
+                catch (e) {
+                    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to delete pending review: ${e}`);
+                }
+            }
+        }
+        catch (e) {
+            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to list reviews: ${e}`);
+        }
+    }
+    async submitReview(pullNumber, commitId, statusMsg) {
+        const body = `${COMMENT_GREETING}
+
+${statusMsg}
+`;
+        if (this.reviewCommentsBuffer.length === 0) {
+            // Submit empty review with statusMsg
+            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Submitting empty review for PR #${pullNumber}`);
+            try {
+                await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.createReview */ .K.pulls.createReview({
+                    owner: repo.owner,
+                    repo: repo.repo,
+                    // eslint-disable-next-line camelcase
+                    pull_number: pullNumber,
+                    // eslint-disable-next-line camelcase
+                    commit_id: commitId,
+                    event: 'COMMENT',
+                    body
+                });
+            }
+            catch (e) {
+                (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to submit empty review: ${e}`);
+            }
+            return;
+        }
         for (const comment of this.reviewCommentsBuffer) {
-            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Posting comment: ${comment.message}`);
-            let found = false;
             const comments = await this.getCommentsAtRange(pullNumber, comment.path, comment.startLine, comment.endLine);
             for (const c of comments) {
                 if (c.body.includes(COMMENT_TAG)) {
-                    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Updating review comment for ${comment.path}:${comment.startLine}-${comment.endLine}: ${comment.message}`);
+                    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Deleting review comment for ${comment.path}:${comment.startLine}-${comment.endLine}: ${comment.message}`);
                     try {
-                        await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.updateReviewComment */ .K.pulls.updateReviewComment({
+                        await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.deleteReviewComment */ .K.pulls.deleteReviewComment({
                             owner: repo.owner,
                             repo: repo.repo,
                             // eslint-disable-next-line camelcase
-                            comment_id: c.id,
-                            body: comment.message
+                            comment_id: c.id
                         });
                     }
                     catch (e) {
-                        (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to update review comment: ${e}`);
+                        (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to delete review comment: ${e}`);
                     }
-                    found = true;
-                    break;
                 }
             }
-            if (!found) {
+        }
+        await this.deletePendingReview(pullNumber);
+        const generateCommentData = (comment) => {
+            const commentData = {
+                path: comment.path,
+                body: comment.message,
+                line: comment.endLine
+            };
+            if (comment.startLine !== comment.endLine) {
+                // eslint-disable-next-line camelcase
+                commentData.start_line = comment.startLine;
+                // eslint-disable-next-line camelcase
+                commentData.start_side = 'RIGHT';
+            }
+            return commentData;
+        };
+        try {
+            const review = await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.createReview */ .K.pulls.createReview({
+                owner: repo.owner,
+                repo: repo.repo,
+                // eslint-disable-next-line camelcase
+                pull_number: pullNumber,
+                // eslint-disable-next-line camelcase
+                commit_id: commitId,
+                comments: this.reviewCommentsBuffer.map(comment => generateCommentData(comment))
+            });
+            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Submitting review for PR #${pullNumber}, total comments: ${this.reviewCommentsBuffer.length}, review id: ${review.data.id}`);
+            await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.submitReview */ .K.pulls.submitReview({
+                owner: repo.owner,
+                repo: repo.repo,
+                // eslint-disable-next-line camelcase
+                pull_number: pullNumber,
+                // eslint-disable-next-line camelcase
+                review_id: review.data.id,
+                event: 'COMMENT',
+                body
+            });
+        }
+        catch (e) {
+            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to create review: ${e}. Falling back to individual comments.`);
+            await this.deletePendingReview(pullNumber);
+            let commentCounter = 0;
+            for (const comment of this.reviewCommentsBuffer) {
                 (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Creating new review comment for ${comment.path}:${comment.startLine}-${comment.endLine}: ${comment.message}`);
                 const commentData = {
                     owner: repo.owner,
@@ -3783,25 +3873,17 @@ ${COMMENT_TAG}`;
                     pull_number: pullNumber,
                     // eslint-disable-next-line camelcase
                     commit_id: commitId,
-                    body: comment.message,
-                    path: comment.path,
-                    line: comment.endLine
+                    ...generateCommentData(comment)
                 };
-                if (comment.startLine !== comment.endLine) {
-                    // eslint-disable-next-line camelcase
-                    commentData.start_side = 'RIGHT';
-                    // eslint-disable-next-line camelcase
-                    commentData.start_line = comment.startLine;
-                }
                 try {
                     await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.createReviewComment */ .K.pulls.createReviewComment(commentData);
                 }
-                catch (e) {
-                    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to create review comment: ${e}`);
+                catch (ee) {
+                    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to create review comment: ${ee}`);
                 }
+                commentCounter++;
+                (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Comment ${commentCounter}/${this.reviewCommentsBuffer.length} posted`);
             }
-            commentCounter++;
-            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.info)(`Comment ${commentCounter}/${this.reviewCommentsBuffer.length} posted`);
         }
     }
     async reviewCommentReply(pullNumber, topLevelComment, message) {
@@ -3968,14 +4050,21 @@ ${chain}
     }
     async create(body, target) {
         try {
-            // get commend ID from the response
-            await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.issues.createComment */ .K.issues.createComment({
+            // get comment ID from the response
+            const response = await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.issues.createComment */ .K.issues.createComment({
                 owner: repo.owner,
                 repo: repo.repo,
                 // eslint-disable-next-line camelcase
                 issue_number: target,
                 body
             });
+            // add comment to issueCommentsCache
+            if (this.issueCommentsCache[target]) {
+                this.issueCommentsCache[target].push(response.data);
+            }
+            else {
+                this.issueCommentsCache[target] = [response.data];
+            }
         }
         catch (e) {
             (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Failed to create comment: ${e}`);
@@ -4115,6 +4204,39 @@ ${chain}
         }
         return allCommits;
     }
+    // add in-progress status to the comment body
+    addInProgressStatus(commentBody, statusMsg) {
+        const start = commentBody.indexOf(IN_PROGRESS_START_TAG);
+        const end = commentBody.indexOf(IN_PROGRESS_END_TAG);
+        // add to the beginning of the comment body if the marker doesn't exist
+        // otherwise do nothing
+        if (start === -1 || end === -1) {
+            return `${IN_PROGRESS_START_TAG}
+
+Currently reviewing new changes in this PR...
+
+${statusMsg}
+
+${IN_PROGRESS_END_TAG}
+
+---
+
+${commentBody}`;
+        }
+        return commentBody;
+    }
+    // remove in-progress status from the comment body
+    removeInProgressStatus(commentBody) {
+        const start = commentBody.indexOf(IN_PROGRESS_START_TAG);
+        const end = commentBody.indexOf(IN_PROGRESS_END_TAG);
+        // remove the in-progress status if the marker exists
+        // otherwise do nothing
+        if (start !== -1 && end !== -1) {
+            return (commentBody.substring(0, start) +
+                commentBody.substring(end + IN_PROGRESS_END_TAG.length));
+        }
+        return commentBody;
+    }
 }
 
 
@@ -4224,7 +4346,7 @@ __nccwpck_require__.r(__webpack_exports__);
 
 
 async function run() {
-    const options = new _options__WEBPACK_IMPORTED_MODULE_2__/* .Options */ .Ei((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('debug'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_release_notes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('max_files'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_simple_changes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('less_verbose_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_comment_lgtm'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getMultilineInput)('path_filters'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('system_message'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_light_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_heavy_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_model_temperature'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_retries'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_timeout_ms'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_concurrency_limit'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_base_url'));
+    const options = new _options__WEBPACK_IMPORTED_MODULE_2__/* .Options */ .Ei((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('debug'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_release_notes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('max_files'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_simple_changes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('less_verbose_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_comment_lgtm'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getMultilineInput)('path_filters'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('system_message'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_light_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_heavy_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_model_temperature'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_retries'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_timeout_ms'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_concurrency_limit'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('github_concurrency_limit'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_base_url'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('language'));
     // print options
     options.print();
     const prompts = new _prompts__WEBPACK_IMPORTED_MODULE_5__/* .Prompts */ .j((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize_release_notes'));
@@ -4307,16 +4429,20 @@ const octokit = new RetryAndThrottlingOctokit({
 Retry after: ${retryAfter} seconds
 Retry count: ${retryCount}
 `);
-            return true;
+            if (retryCount <= 3) {
+                (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`Retrying after ${retryAfter} seconds!`);
+                return true;
+            }
         },
-        onSecondaryRateLimit: (_retryAfter, options) => {
-            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`SecondaryRateLimit detected for request ${options.method} ${options.url}`);
+        onSecondaryRateLimit: (retryAfter, options) => {
+            (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.warning)(`SecondaryRateLimit detected for request ${options.method} ${options.url} ; retry after ${retryAfter} seconds`);
+            // if we are doing a POST method on /repos/{owner}/{repo}/pulls/{pull_number}/reviews then we shouldn't retry
+            if (options.method === 'POST' &&
+                options.url.match(/\/repos\/.*\/.*\/pulls\/.*\/reviews/)) {
+                return false;
+            }
             return true;
         }
-    },
-    retry: {
-        doNotRetry: ['429'],
-        maxRetries: 10
     }
 });
 
@@ -6115,6 +6241,10 @@ class TokenLimits {
             this.maxTokens = 32600;
             this.responseTokens = 4000;
         }
+        else if (model === 'gpt-3.5-turbo-16k') {
+            this.maxTokens = 16300;
+            this.responseTokens = 3000;
+        }
         else if (model === 'gpt-4') {
             this.maxTokens = 8000;
             this.responseTokens = 2000;
@@ -6151,10 +6281,12 @@ class Options {
     openaiRetries;
     openaiTimeoutMS;
     openaiConcurrencyLimit;
+    githubConcurrencyLimit;
     lightTokenLimits;
     heavyTokenLimits;
     apiBaseUrl;
-    constructor(debug, disableReview, disableReleaseNotes, maxFiles = '0', reviewSimpleChanges = false, lessVerboseReview = false, reviewCommentLGTM = false, pathFilters = null, systemMessage = '', openaiLightModel = 'gpt-3.5-turbo', openaiHeavyModel = 'gpt-3.5-turbo', openaiModelTemperature = '0.0', openaiRetries = '3', openaiTimeoutMS = '120000', openaiConcurrencyLimit = '4', apiBaseUrl = 'https://api.openai.com/v1') {
+    language;
+    constructor(debug, disableReview, disableReleaseNotes, maxFiles = '0', reviewSimpleChanges = false, lessVerboseReview = false, reviewCommentLGTM = false, pathFilters = null, systemMessage = '', openaiLightModel = 'gpt-3.5-turbo', openaiHeavyModel = 'gpt-3.5-turbo', openaiModelTemperature = '0.0', openaiRetries = '3', openaiTimeoutMS = '120000', openaiConcurrencyLimit = '6', githubConcurrencyLimit = '6', apiBaseUrl = 'https://api.openai.com/v1', language = 'en-US') {
         this.debug = debug;
         this.disableReview = disableReview;
         this.disableReleaseNotes = disableReleaseNotes;
@@ -6170,9 +6302,11 @@ class Options {
         this.openaiRetries = parseInt(openaiRetries);
         this.openaiTimeoutMS = parseInt(openaiTimeoutMS);
         this.openaiConcurrencyLimit = parseInt(openaiConcurrencyLimit);
+        this.githubConcurrencyLimit = parseInt(githubConcurrencyLimit);
         this.lightTokenLimits = new TokenLimits(openaiLightModel);
         this.heavyTokenLimits = new TokenLimits(openaiHeavyModel);
         this.apiBaseUrl = apiBaseUrl;
+        this.language = language;
     }
     // print all options using core.info
     print() {
@@ -6191,9 +6325,11 @@ class Options {
         (0,core.info)(`openai_retries: ${this.openaiRetries}`);
         (0,core.info)(`openai_timeout_ms: ${this.openaiTimeoutMS}`);
         (0,core.info)(`openai_concurrency_limit: ${this.openaiConcurrencyLimit}`);
+        (0,core.info)(`github_concurrency_limit: ${this.githubConcurrencyLimit}`);
         (0,core.info)(`summary_token_limits: ${this.lightTokenLimits.string()}`);
         (0,core.info)(`review_token_limits: ${this.heavyTokenLimits.string()}`);
         (0,core.info)(`api_base_url: ${this.apiBaseUrl}`);
+        (0,core.info)(`language: ${this.language}`);
     }
     checkPath(path) {
         const ok = this.pathFilters.check(path);
@@ -6285,9 +6421,13 @@ $description
 $file_diff
 \`\`\`
 
-## Instructions for you
+## Instructions
 
-I would like you to summarize the diff within 50 words.
+I would like you to succinctly summarize the diff within 100 words.
+If applicable, your summary should include a note about alterations 
+to the signatures of exported functions, global data structures and 
+variables, and any changes that might affect the external interface or 
+behavior of the code.
 `;
     triageFileDiff = `Below the summary, I would also like you to triage the diff as \`NEEDS_REVIEW\` or 
 \`APPROVED\` based on the following criteria:
@@ -6303,33 +6443,43 @@ lines changed, the potential impact on the overall system, and the likelihood of
 introducing new bugs or security vulnerabilities. 
 When in doubt, always err on the side of caution and triage the diff as \`NEEDS_REVIEW\`.
 
-You must follow the format below strictly for triaging the diff and 
-do not add any additional text in your response:
+You must strictly follow the format below for triaging the diff:
 [TRIAGE]: <NEEDS_REVIEW or APPROVED>
+
+Important:
+- In your summary do not mention that the file needs a through review or caution about
+  potential issues.
+- Do not provide any reasoning why you triaged the diff as \`NEEDS_REVIEW\` or \`APPROVED\`.
+- Do not mention that these changes affect the logic or functionality of the code in 
+  the summary. You must only use the triage status format above to indicate that.
 `;
     lessVerboseTriageFileDiff = `Below the summary, I would also like you to triage the diff as \`NEEDS_REVIEW\` or 
-\`APPROVED\` based on the following criteria:
-
-- If the diff involves any major modifications to the logic or functionality triage 
-  it as \`NEEDS_REVIEW\`. This includes changes to control structures, 
-  function calls, or variable assignments that might impact the behavior of the code.
-- If the diff contains minor changes that don't affect the code logic, such as 
-  fixing typos, formatting, or renaming variables for clarity, triage it as \`APPROVED\`.
-
-Please evaluate the diff thoroughly and take into account factors such as the number of 
-lines changed, the potential impact on the overall system, and the likelihood of 
-introducing new bugs or security vulnerabilities. 
-When in doubt, always err on the side of approving and triage the diff as \`APPROVED\`.
-
-You must follow the format below strictly for triaging the diff and 
-do not add any additional text in your response:
-[TRIAGE]: <NEEDS_REVIEW or APPROVED>
+  \`APPROVED\` based on the following criteria:
+  
+  - If the diff could cause a serious error or problem triage it as \`NEEDS_REVIEW\`.
+    function calls, or variable assignments that might impact the behavior of the code.
+  - If the diff won't cause any serious errors or issues then triage it as \`APPROVED\`.
+  
+  Please evaluate the diff thoroughly and take into account factors such as the number of 
+  lines changed, the potential impact on the overall system, and the likelihood of 
+  introducing new bugs or security vulnerabilities. 
+  When in doubt, triage the diff as \`APPROVED\`.
+  
+  You must strictly follow the format below for triaging the diff:
+  [TRIAGE]: <NEEDS_REVIEW or APPROVED>
+  
+  Important:
+  - In your summary do not mention that the file needs a through review or caution about
+    potential issues.
+  - Do not provide any reasoning why you triaged the diff as \`NEEDS_REVIEW\` or \`APPROVED\`.
+  - Do not mention that these changes affect the logic or functionality of the code in 
+    the summary. You must only use the triage status format above to indicate that.
 `;
     summarizeChangesets = `Provided below are changesets in this pull request. Changesets 
 are in chronlogical order and new changesets are appended to the
 end of the list. The format consists of filename(s) and the summary 
 of changes for those files. There is a separator between each changeset.
-Your task is to de-deduplicate and group together files with
+Your task is to deduplicate and group together files with
 related/similar changes into a single changeset. Respond with the updated 
 changesets using the same format as the input. 
 
@@ -6341,10 +6491,17 @@ $raw_summary
       \`\`\`
 
 `;
-    summarizeShort = `Your task is to provide a concise summary of the changes 
-and the goal of this PR. This summary will be used as a prompt while reviewing each 
-file and must be very clear for the AI bot to understand. The summary should not 
-exceed 250 words.
+    summarizeShort = `Your task is to provide a concise summary of the changes. This 
+summary will be used as a prompt while reviewing each file and must be very clear for 
+the AI bot to understand. 
+
+Instructions:
+
+- Focus on summarizing only the changes in the PR and stick to the facts.
+- Do not provide any instructions to the bot on how to perform the review.
+- Do not mention that files need a through review or caution about potential issues.
+- Do not mention that these changes affect the logic or functionality of the code.
+- The summary should not exceed 500 words.
 `;
     reviewFileDiff = `## GitHub PR Title
 
@@ -6356,131 +6513,83 @@ exceed 250 words.
 $description
 \`\`\`
 
-## Summary generated by the AI bot
+## Summary of changes
 
 \`\`\`
 $short_summary
 \`\`\`
 
-## How to parse the changes
+## IMPORTANT Instructions
 
-The format for changes provided below consists of multiple change 
-sections, each containing a new hunk (annotated with line numbers), 
-an old hunk, and optionally, existing comment chains. Note that the 
-old hunk code has been replaced by the new hunk to fulfill the 
-goal of this PR. The line number annotation on each line in the new 
-hunk is of the format \`<line_number><colon><whitespace>\`.
+Input: New hunks annotated with line numbers and old hunks (replaced code). Hunks represent incomplete code fragments.
+Additional Context: PR title, description, summaries and comment chains.
+Task: Review new hunks for substantive issues using provided context and respond with comments if necessary.
+Output: Review comments in markdown with exact line number ranges in new hunks. Start and end line numbers must be within the same hunk. For single-line comments, start=end line number. Must use example response format below.
+Use fenced code blocks using the relevant language identifier where applicable.
+Don't annotate code snippets with line numbers. Format and indent code correctly.
+Do not use \`suggestion\` code blocks.
+For fixes, use \`diff\` code blocks, marking changes with \`+\` or \`-\`. The line number range for comments with fix snippets must exactly match the range to replace in the new hunk.
 
-### Format for changes
+- Do NOT provide general feedback, summaries, explanations of changes, or praises 
+  for making good additions. 
+- Focus solely on offering specific, objective insights based on the 
+  given context and refrain from making broad comments about potential impacts on 
+  the system or question intentions behind the changes.
 
-  ---new_hunk---
-  \`\`\`
-  <new hunk annotated with line numbers>
-  \`\`\`
-
-  ---old_hunk---
-  \`\`\`
-  <old hunk that was replaced by the new hunk above>
-  \`\`\`
-
-  ---comment_chains---
-  \`\`\`
-  <comment chains>
-  \`\`\`
-
-  ---end_change_section---
-  ...
-
-## How you must respond
-
-- Your task is to review ONLY the new hunks line by line, ONLY pointing out 
-  substantive issues within line number ranges. Provide the exact line 
-  number range (inclusive) for each issue. Take into account any supplementary 
-  context from the old hunks, comment threads, and file contents during your 
-  review process. Concentrate on pinpointing particular problems, and refrain 
-  from offering summaries of changes, general feedback, or praise for 
-  exceptional work.
-- IMPORTANT: Respond only in the below response format (consisting of review 
-  sections). Each review section must have a line number range and a review 
-  comment for that range. Do not include general feedback or summaries. You 
-  may optionally include a single replacement suggestion snippet and/or 
-  multiple new code snippets in the review comment. Separate review sections 
-  using separators.
-- IMPORTANT: Line number ranges for each review section must be within the 
-  range of a specific new hunk. <start_line_number> must belong to the same 
-  hunk as the <end_line_number>. The line number range is sufficient to map 
-  your comment to the code changes in the GitHub pull request.
-- Use Markdown format for review comment text and fenced code blocks for
-  code snippets. Do not annotate code snippets with line numbers.
-- If needed, provide replacement code suggestions to fix the issue by using 
-  fenced code blocks with the \`suggestion\` as the language identifier. The 
-  line number range must map exactly to the range (inclusive) that needs to 
-  be replaced within a new hunk. For instance, if 2 lines of code in a hunk 
-  need to be replaced with 15 lines of code, the line number range must be 
-  those exact 2 lines. If an entire hunk need to be replaced with new code, 
-  then the line number range must be the entire hunk and the new code must
-  exactly replace all the lines in the hunk.
-- Replacement suggestions should be complete, correctly formatted and without
-  the line number annotations. Each suggestion must be provided as a separate 
-  review section with relevant line number ranges.
-- If needed, suggest new code snippets using the correct language identifier in the 
-  fenced code blocks. These snippets may be added to a different file 
-  (e.g. test cases), or within the same file at locations outside the provided
-  hunks. Multiple new code snippets are allowed within a single review section.
-- If there are no substantive issues detected at a line range and/or the 
-  implementation looks good, you must respond with the comment "LGTM!" and 
-  nothing else for the respective line range in a review section.
-- Reflect on your comments and line number ranges before sending the final 
-  response to ensure accuracy of line number ranges and replacement snippets.
-
-### Response format expected
-
-  <start_line_number>-<end_line_number>:
-  <review comment>
-  ---
-  <start_line_number>-<end_line_number>:
-  <review comment>
-  \`\`\`suggestion
-  <code/text that replaces everything between start_line_number and end_line_number>
-  \`\`\`
-  ---
-  <start_line_number>-<end_line_number>:
-  <review comment>
-  \`\`\`<language>
-  <new code snippet>
-  \`\`\`
-  ---
-  ...
+If there are no issues found on a line range, you MUST respond with the 
+text \`LGTM!\` for that line range in the review section. 
 
 ## Example
 
 ### Example changes
 
-  ---new_hunk---
-  1: def add(x, y):
-  2:     z = x+y
-  3:     retrn z
-  4:
-  5: def multiply(x, y):
-  6:     return x * y
+---new_hunk---
+\`\`\`
+  z = x / y
+    return z
+
+20: def add(x, y):
+21:     z = x + y
+22:     retrn z
+23: 
+24: def multiply(x, y):
+25:     return x * y
+
+def subtract(x, y):
+  z = x - y
+\`\`\`
   
-  ---old_hunk---
-  def add(x, y):
-      return x + y
+---old_hunk---
+\`\`\`
+  z = x / y
+    return z
+
+def add(x, y):
+    return x + y
+
+def subtract(x, y):
+    z = x - y
+\`\`\`
+
+---comment_chains---
+\`\`\`
+Please review this change.
+\`\`\`
+
+---end_change_section---
 
 ### Example response
 
-  1-3:
-  There's a typo in the return statement.
-  \`\`\`suggestion
-  def add(x, y):
-      z = x + y
-      return z
-  \`\`\`
-  ---
-  5-6:
-  LGTM!
-  ---
+22-22:
+There's a syntax error in the add function.
+\`\`\`diff
+-    retrn z
++    return z
+\`\`\`
+---
+24-25:
+LGTM!
+---
 
 ## Changes made to \`$filename\` for your review
 
@@ -6518,7 +6627,7 @@ $file_diff
 $diff
 \`\`\`
 
-## Instructions for you
+## Instructions
 
 Please reply directly to the new comment (instead of suggesting 
 a reply) and your reply will be posted as-is.
@@ -6911,6 +7020,7 @@ const ignoreKeyword = '@redrover: ignore';
 const codeReview = async (lightBot, heavyBot, options, prompts) => {
     const commenter = new lib_commenter/* Commenter */.Es();
     const openaiConcurrencyLimit = pLimit(options.openaiConcurrencyLimit);
+    const githubConcurrencyLimit = pLimit(options.githubConcurrencyLimit);
     if (context.eventName !== 'pull_request' &&
         context.eventName !== 'pull_request_target') {
         (0,core.warning)(`Skipped: current event is ${context.eventName}, only support pull_request event`);
@@ -6935,10 +7045,12 @@ const codeReview = async (lightBot, heavyBot, options, prompts) => {
     // get SUMMARIZE_TAG message
     const existingSummarizeCmt = await commenter.findCommentWithTag(lib_commenter/* SUMMARIZE_TAG */.Rp, context.payload.pull_request.number);
     let existingCommitIdsBlock = '';
+    let existingSummarizeCmtBody = '';
     if (existingSummarizeCmt != null) {
-        inputs.rawSummary = commenter.getRawSummary(existingSummarizeCmt.body);
-        inputs.shortSummary = commenter.getShortSummary(existingSummarizeCmt.body);
-        existingCommitIdsBlock = commenter.getReviewedCommitIdsBlock(existingSummarizeCmt.body);
+        existingSummarizeCmtBody = existingSummarizeCmt.body;
+        inputs.rawSummary = commenter.getRawSummary(existingSummarizeCmtBody);
+        inputs.shortSummary = commenter.getShortSummary(existingSummarizeCmtBody);
+        existingCommitIdsBlock = commenter.getReviewedCommitIdsBlock(existingSummarizeCmtBody);
     }
     const allCommitIds = await commenter.getAllCommitIds();
     // find highest reviewed commit id
@@ -6980,11 +7092,6 @@ const codeReview = async (lightBot, heavyBot, options, prompts) => {
         (0,core.warning)('Skipped: files is null');
         return;
     }
-    const commits = incrementalDiff.data.commits;
-    if (commits.length === 0) {
-        (0,core.warning)('Skipped: ommits is null');
-        return;
-    }
     // skip files if they are filtered out
     const filterSelectedFiles = [];
     const filterIgnoredFiles = [];
@@ -6997,8 +7104,17 @@ const codeReview = async (lightBot, heavyBot, options, prompts) => {
             filterSelectedFiles.push(file);
         }
     }
+    if (filterSelectedFiles.length === 0) {
+        (0,core.warning)('Skipped: filterSelectedFiles is null');
+        return;
+    }
+    const commits = incrementalDiff.data.commits;
+    if (commits.length === 0) {
+        (0,core.warning)('Skipped: commits is null');
+        return;
+    }
     // find hunks to review
-    const filteredFiles = await Promise.all(filterSelectedFiles.map(async (file) => {
+    const filteredFiles = await Promise.all(filterSelectedFiles.map(file => githubConcurrencyLimit(async () => {
         // retrieve file contents
         let fileContent = '';
         if (context.payload.pull_request == null) {
@@ -7061,13 +7177,43 @@ ${hunks.oldHunk}
         else {
             return null;
         }
-    }));
+    })));
     // Filter out any null results
     const filesAndChanges = filteredFiles.filter(file => file !== null);
     if (filesAndChanges.length === 0) {
         (0,core.error)('Skipped: no files to review');
         return;
     }
+    let statusMsg = `<details>
+<summary>Commits</summary>
+Files that changed from the base of the PR and between ${highestReviewedCommitId} and ${context.payload.pull_request.head.sha} commits.
+</details>
+${filesAndChanges.length > 0
+        ? `
+<details>
+<summary>Files selected (${filesAndChanges.length})</summary>
+
+* ${filesAndChanges
+            .map(([filename, , , patches]) => `${filename} (${patches.length})`)
+            .join('\n* ')}
+</details>
+`
+        : ''}
+${filterIgnoredFiles.length > 0
+        ? `
+<details>
+<summary>Files ignored due to filter (${filterIgnoredFiles.length})</summary>
+
+* ${filterIgnoredFiles.map(file => file.filename).join('\n* ')}
+
+</details>
+`
+        : ''}
+`;
+    // update the existing comment with in progress status
+    const inProgressSummarizeCmt = commenter.addInProgressStatus(existingSummarizeCmtBody, statusMsg);
+    // add in progress status to the summarize comment
+    await commenter.comment(`${inProgressSummarizeCmt}`, lib_commenter/* SUMMARIZE_TAG */.Rp, 'replace');
     const summariesFailed = [];
     const doSummary = async (filename, fileContent, fileDiff) => {
         (0,core.info)(`summarize: ${filename}`);
@@ -7078,19 +7224,18 @@ ${hunks.oldHunk}
             return null;
         }
         ins.filename = filename;
+        ins.fileDiff = fileDiff;
         // render prompt based on inputs so far
-        let tokens = (0,tokenizer/* getTokenCount */.V)(prompts.renderSummarizeFileDiff(ins, options.reviewSimpleChanges, options.lessVerboseReview));
-        const diffTokens = (0,tokenizer/* getTokenCount */.V)(fileDiff);
-        if (tokens + diffTokens > options.lightTokenLimits.requestTokens) {
+        const summarizePrompt = prompts.renderSummarizeFileDiff(ins, options.reviewSimpleChanges, options.lessVerboseReview);
+        const tokens = (0,tokenizer/* getTokenCount */.V)(summarizePrompt);
+        if (tokens > options.lightTokenLimits.requestTokens) {
             (0,core.info)(`summarize: diff tokens exceeds limit, skip ${filename}`);
             summariesFailed.push(`${filename} (diff tokens exceeds limit)`);
             return null;
         }
-        ins.fileDiff = fileDiff;
-        tokens += fileDiff.length;
         // summarize content
         try {
-            const [summarizeResp] = await lightBot.chat(prompts.renderSummarizeFileDiff(ins, options.reviewSimpleChanges, options.lessVerboseReview), {});
+            const [summarizeResp] = await lightBot.chat(summarizePrompt, {});
             if (summarizeResp === '') {
                 (0,core.info)('summarize: nothing fetched from RedRover');
                 summariesFailed.push(`${filename} (nothing fetched from RedRover)`);
@@ -7185,53 +7330,22 @@ ${lib_commenter/* RAW_SUMMARY_END_TAG */.rV}
 ${lib_commenter/* SHORT_SUMMARY_START_TAG */.O$}
 ${inputs.shortSummary}
 ${lib_commenter/* SHORT_SUMMARY_END_TAG */.Zb}
----
-
-### Chat with 🐶 RedRover Bot (\`@redrover\`)
-- Reply on review comments left by this bot to ask follow-up questions. A review comment is a comment on a diff or a file.
-- Invite the bot into a review comment chain by tagging \`@redrover\` in a reply.
-
-### Code suggestions
-- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned.
-- You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
-
-### Ignoring further reviews
-- Type \`@redrover: ignore\` anywhere in the PR description to ignore further reviews from the bot.
-
----
-
-${filterIgnoredFiles.length > 0
-        ? `
-<details>
-<summary>Files ignored due to filter (${filterIgnoredFiles.length})</summary>
-
-### Ignored files
-
-* ${filterIgnoredFiles.map(file => file.filename).join('\n* ')}
-
-</details>
-`
-        : ''}
-
+`;
+    statusMsg += `
 ${skippedFiles.length > 0
         ? `
 <details>
 <summary>Files not processed due to max files limit (${skippedFiles.length})</summary>
-
-### Not processed
 
 * ${skippedFiles.join('\n* ')}
 
 </details>
 `
         : ''}
-
 ${summariesFailed.length > 0
         ? `
 <details>
 <summary>Files not summarized due to errors (${summariesFailed.length})</summary>
-
-### Failed to summarize
 
 * ${summariesFailed.join('\n* ')}
 
@@ -7249,6 +7363,8 @@ ${summariesFailed.length > 0
             .map(([filename]) => filename);
         // failed reviews array
         const reviewsFailed = [];
+        let lgtmCount = 0;
+        let reviewCount = 0;
         const doReview = async (filename, fileContent, patches) => {
             (0,core.info)(`reviewing ${filename}`);
             // make a copy of inputs
@@ -7317,38 +7433,53 @@ ${commentChain}
 ---end_change_section---
 `;
             }
-            // perform review
-            try {
-                const [response] = await heavyBot.chat(prompts.renderReviewFileDiff(ins), {});
-                if (response === '') {
-                    (0,core.info)('review: nothing fetched from RedRover');
-                    reviewsFailed.push(`${filename} (no response)`);
-                    return;
+            if (patchesPacked > 0) {
+                // perform review
+                try {
+                    const [response] = await heavyBot.chat(prompts.renderReviewFileDiff(ins), {});
+                    if (response === '') {
+                        (0,core.info)('review: nothing obtained from openai');
+                        reviewsFailed.push(`${filename} (no response)`);
+                        return;
+                    }
+                    // parse review
+                    const reviews = parseReview(response, patches, options.debug);
+                    for (const review of reviews) {
+                        // check for LGTM
+                        if (!options.reviewCommentLGTM &&
+                            (review.comment.includes('LGTM') ||
+                                review.comment.includes('looks good to me'))) {
+                            lgtmCount += 1;
+                            continue;
+                        }
+                        if (context.payload.pull_request == null) {
+                            (0,core.warning)('No pull request found, skipping.');
+                            continue;
+                        }
+                        // If lessVerboseReview option is enabled, only post comments for major issues
+                        if (options.lessVerboseReview &&
+                            !review.comment.includes('error') &&
+                            !review.comment.includes('exception') &&
+                            !review.comment.includes('critical')) {
+                            (0,core.info)(`Skipping minor issue in ${filename} lines ${review.startLine}-${review.endLine}`);
+                            continue;
+                        }
+                        try {
+                            reviewCount += 1;
+                            await commenter.bufferReviewComment(filename, review.startLine, review.endLine, `${review.comment}`);
+                        }
+                        catch (e) {
+                            reviewsFailed.push(`${filename} comment failed (${e})`);
+                        }
+                    }
                 }
-                // parse review
-                const reviews = parseReview(response, patches, options.debug);
-                for (const review of reviews) {
-                    // check for LGTM
-                    if (!options.reviewCommentLGTM &&
-                        (review.comment.includes('LGTM') ||
-                            review.comment.includes('looks good to me'))) {
-                        continue;
-                    }
-                    if (context.payload.pull_request == null) {
-                        (0,core.warning)('No pull request found, skipping.');
-                        continue;
-                    }
-                    try {
-                        await commenter.bufferReviewComment(filename, review.startLine, review.endLine, `${review.comment}`);
-                    }
-                    catch (e) {
-                        reviewsFailed.push(`${filename} comment failed (${e})`);
-                    }
+                catch (e) {
+                    (0,core.warning)(`Failed to review: ${e}, skipping. backtrace: ${e.stack}`);
+                    reviewsFailed.push(`${filename} (${e})`);
                 }
             }
-            catch (e) {
-                (0,core.warning)(`Failed to review: ${e}, skipping. backtrace: ${e.stack}`);
-                reviewsFailed.push(`${filename} (${e})`);
+            else {
+                reviewsSkipped.push(`${filename} (diff too large)`);
             }
         };
         const reviewPromises = [];
@@ -7363,41 +7494,58 @@ ${commentChain}
             }
         }
         await Promise.all(reviewPromises);
-        summarizeComment += `
----
-In the recent run, only the files that changed from the \`base\` of the PR and between \`${highestReviewedCommitId}\` and \`${context.payload.pull_request.head.sha}\` commits were reviewed.
-
+        statusMsg += `
 ${reviewsFailed.length > 0
             ? `<details>
-<summary>Files not reviewed due to errors in the recent run (${reviewsFailed.length})</summary>
-
-### Failed to review in the last run
+<summary>Files not reviewed due to errors (${reviewsFailed.length})</summary>
 
 * ${reviewsFailed.join('\n* ')}
 
 </details>
 `
             : ''}
-
 ${reviewsSkipped.length > 0
             ? `<details>
-<summary>Files not reviewed due to simple changes (${reviewsSkipped.length})</summary>
-
-### Skipped review in the recent run
+<summary>Files skipped from review due to trivial changes (${reviewsSkipped.length})</summary>
 
 * ${reviewsSkipped.join('\n* ')}
 
 </details>
 `
             : ''}
+<details>
+<summary>Review comments generated (${reviewCount + lgtmCount})</summary>
+
+* Review: ${reviewCount}
+* LGTM: ${lgtmCount}
+
+</details>
+
+---
+
+<details>
+<summary>Tips</summary>
+
+### Chat with RedRover (\`@redrover\`)
+- Reply on review comments left by this bot to ask follow-up questions. A review comment is a comment on a diff or a file.
+- Invite the bot into a review comment chain by tagging \`@redrover\` in a reply.
+
+### Code suggestions
+- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned. 
+- You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
+
+### Pausing incremental reviews
+- Add \`@redrover: ignore\` anywhere in the PR description to pause further reviews from the bot.
+
+</details>
 `;
         // add existing_comment_ids_block with latest head sha
         summarizeComment += `\n${commenter.addReviewedCommitId(existingCommitIdsBlock, context.payload.pull_request.head.sha)}`;
+        // post the review
+        await commenter.submitReview(context.payload.pull_request.number, commits[commits.length - 1].sha, statusMsg);
     }
     // post the final summary comment
     await commenter.comment(`${summarizeComment}`, lib_commenter/* SUMMARIZE_TAG */.Rp, 'replace');
-    // post the review
-    await commenter.submitReview(context.payload.pull_request.number, commits[commits.length - 1].sha);
 };
 const splitPatch = (patch) => {
     if (patch == null) {
@@ -7451,26 +7599,36 @@ const parsePatch = (patch) => {
     }
     const oldHunkLines = [];
     const newHunkLines = [];
-    // let old_line = hunkInfo.old_hunk.start_line
     let newLine = hunkInfo.newHunk.startLine;
     const lines = patch.split('\n').slice(1); // Skip the @@ line
     // Remove the last line if it's empty
     if (lines[lines.length - 1] === '') {
         lines.pop();
     }
+    // Skip annotations for the first 3 and last 3 lines
+    const skipStart = 3;
+    const skipEnd = 3;
+    let currentLine = 0;
+    const removalOnly = !lines.some(line => line.startsWith('+'));
     for (const line of lines) {
+        currentLine++;
         if (line.startsWith('-')) {
             oldHunkLines.push(`${line.substring(1)}`);
-            // old_line++
         }
         else if (line.startsWith('+')) {
             newHunkLines.push(`${newLine}: ${line.substring(1)}`);
             newLine++;
         }
         else {
+            // context line
             oldHunkLines.push(`${line}`);
-            newHunkLines.push(`${newLine}: ${line}`);
-            // old_line++
+            if (removalOnly ||
+                (currentLine > skipStart && currentLine <= lines.length - skipEnd)) {
+                newHunkLines.push(`${newLine}: ${line}`);
+            }
+            else {
+                newHunkLines.push(`${line}`);
+            }
             newLine++;
         }
     }
@@ -7481,6 +7639,7 @@ const parsePatch = (patch) => {
 };
 function parseReview(response, patches, debug = false) {
     const reviews = [];
+    response = sanitizeResponse(response.trim());
     const lines = response.split('\n');
     const lineNumberRangeRegex = /(?:^|\s)(\d+)-(\d+):\s*$/;
     const commentSeparator = '---';
@@ -7489,11 +7648,10 @@ function parseReview(response, patches, debug = false) {
     let currentComment = '';
     function storeReview() {
         if (currentStartLine !== null && currentEndLine !== null) {
-            const sanitizedComment = sanitizeComment(currentComment.trim());
             const review = {
                 startLine: currentStartLine,
                 endLine: currentEndLine,
-                comment: sanitizedComment.trim()
+                comment: currentComment
             };
             let withinPatch = false;
             let bestPatchStartLine = -1;
@@ -7533,26 +7691,31 @@ ${review.comment}`;
             (0,core.info)(`Stored comment for line range ${currentStartLine}-${currentEndLine}: ${currentComment.trim()}`);
         }
     }
-    function sanitizeComment(comment) {
-        const suggestionStart = '```suggestion';
-        const suggestionEnd = '```';
+    function sanitizeCodeBlock(comment, codeBlockLabel) {
+        const codeBlockStart = `\`\`\`${codeBlockLabel}`;
+        const codeBlockEnd = '```';
         const lineNumberRegex = /^ *(\d+): /gm;
-        let suggestionStartIndex = comment.indexOf(suggestionStart);
-        while (suggestionStartIndex !== -1) {
-            const suggestionEndIndex = comment.indexOf(suggestionEnd, suggestionStartIndex + suggestionStart.length);
-            if (suggestionEndIndex === -1)
+        let codeBlockStartIndex = comment.indexOf(codeBlockStart);
+        while (codeBlockStartIndex !== -1) {
+            const codeBlockEndIndex = comment.indexOf(codeBlockEnd, codeBlockStartIndex + codeBlockStart.length);
+            if (codeBlockEndIndex === -1)
                 break;
-            const suggestionBlock = comment.substring(suggestionStartIndex + suggestionStart.length, suggestionEndIndex);
-            const sanitizedBlock = suggestionBlock.replace(lineNumberRegex, '');
+            const codeBlock = comment.substring(codeBlockStartIndex + codeBlockStart.length, codeBlockEndIndex);
+            const sanitizedBlock = codeBlock.replace(lineNumberRegex, '');
             comment =
-                comment.slice(0, suggestionStartIndex + suggestionStart.length) +
+                comment.slice(0, codeBlockStartIndex + codeBlockStart.length) +
                     sanitizedBlock +
-                    comment.slice(suggestionEndIndex);
-            suggestionStartIndex = comment.indexOf(suggestionStart, suggestionStartIndex +
-                suggestionStart.length +
+                    comment.slice(codeBlockEndIndex);
+            codeBlockStartIndex = comment.indexOf(codeBlockStart, codeBlockStartIndex +
+                codeBlockStart.length +
                 sanitizedBlock.length +
-                suggestionEnd.length);
+                codeBlockEnd.length);
         }
+        return comment;
+    }
+    function sanitizeResponse(comment) {
+        comment = sanitizeCodeBlock(comment, 'suggestion');
+        comment = sanitizeCodeBlock(comment, 'diff');
         return comment;
     }
     for (const line of lines) {
