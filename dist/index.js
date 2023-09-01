@@ -3630,10 +3630,10 @@ const COMMENT_REPLY_TAG = '<!-- This is an auto-generated reply by RedRover -->'
 const SUMMARIZE_TAG = '<!-- This is an auto-generated comment: summarize by RedRover -->';
 const IN_PROGRESS_START_TAG = '<!-- This is an auto-generated comment: summarize review in progress by RedRover -->';
 const IN_PROGRESS_END_TAG = '<!-- end of auto-generated comment: summarize review in progress by RedRover -->';
-const DESCRIPTION_START_TAG = `
-<!-- This is an auto-generated comment: release notes by RedRover -->`;
+const DESCRIPTION_START_TAG = `<!-- This is an auto-generated comment: release notes by RedRover -->`;
 const DESCRIPTION_END_TAG = '<!-- end of auto-generated comment: release notes by RedRover -->';
-const RAW_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: raw summary by RedRover --><!--
+const RAW_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: raw summary by RedRover -->
+<!--
 `;
 const RAW_SUMMARY_END_TAG = `--><!-- end of auto-generated comment: raw summary by RedRover -->`;
 const SHORT_SUMMARY_START_TAG = `<!-- This is an auto-generated comment: short summary by RedRover --><!--
@@ -3686,7 +3686,7 @@ ${tag}`;
     }
     removeContentWithinTags(content, startTag, endTag) {
         const start = content.indexOf(startTag);
-        const end = content.indexOf(endTag);
+        const end = content.lastIndexOf(endTag);
         if (start >= 0 && end >= 0) {
             return content.slice(0, start) + content.slice(end + endTag.length);
         }
@@ -3722,7 +3722,7 @@ ${tag}`;
             }
             const description = this.getDescription(body);
             const messageClean = this.removeContentWithinTags(message, DESCRIPTION_START_TAG, DESCRIPTION_END_TAG);
-            const newDescription = `${description}${DESCRIPTION_START_TAG}\n${messageClean}\n${DESCRIPTION_END_TAG}`;
+            const newDescription = `${description}\n${DESCRIPTION_START_TAG}\n${messageClean}\n${DESCRIPTION_END_TAG}`;
             await _octokit__WEBPACK_IMPORTED_MODULE_2__/* .octokit.pulls.update */ .K.pulls.update({
                 owner: repo.owner,
                 repo: repo.repo,
@@ -4349,7 +4349,7 @@ async function run() {
     const options = new _options__WEBPACK_IMPORTED_MODULE_2__/* .Options */ .Ei((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('debug'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('disable_release_notes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('max_files'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_simple_changes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('less_verbose_review'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('review_comment_lgtm'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getMultilineInput)('path_filters'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('system_message'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_light_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_heavy_model'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_model_temperature'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_retries'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_timeout_ms'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_concurrency_limit'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('github_concurrency_limit'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('openai_base_url'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('language'));
     // print options
     options.print();
-    const prompts = new _prompts__WEBPACK_IMPORTED_MODULE_5__/* .Prompts */ .j((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize_release_notes'));
+    const prompts = new _prompts__WEBPACK_IMPORTED_MODULE_5__/* .Prompts */ .j((0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('summarize_release_notes'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getBooleanInput)('poem_enabled'), (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)('poem'));
     // Create two bots, one for summary and one for review
     let lightBot = null;
     try {
@@ -6405,6 +6405,8 @@ class OpenAIOptions {
 class Prompts {
     summarize;
     summarizeReleaseNotes;
+    poemEnabled;
+    poem;
     summarizeFileDiff = `## GitHub PR Title
 
 \`$title\` 
@@ -6655,9 +6657,11 @@ $comment_chain
 $comment
 \`\`\`
 `;
-    constructor(summarize = '', summarizeReleaseNotes = '') {
+    constructor(summarize = '', summarizeReleaseNotes = '', poemEnabled = false, poem = '') {
         this.summarize = summarize;
         this.summarizeReleaseNotes = summarizeReleaseNotes;
+        this.poemEnabled = poemEnabled;
+        this.poem = poem;
     }
     renderSummarizeFileDiff(inputs, reviewSimpleChanges, lessVerboseReview) {
         let prompt = this.summarizeFileDiff;
@@ -6673,7 +6677,10 @@ $comment
         return inputs.render(this.summarizeChangesets);
     }
     renderSummarize(inputs) {
-        const prompt = this.summarizePrefix + this.summarize;
+        let prompt = this.summarizePrefix + this.summarize;
+        if (this.poemEnabled) {
+            prompt += `\n ${this.poem}`;
+        }
         return inputs.render(prompt);
     }
     renderSummarizeShort(inputs) {
