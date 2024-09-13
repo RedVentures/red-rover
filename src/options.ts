@@ -34,8 +34,8 @@ export class Options {
     reviewCommentLGTM = false,
     pathFilters: string[] | null = null,
     systemMessage = '',
-    openaiLightModel = 'gpt-3.5-turbo',
-    openaiHeavyModel = 'gpt-3.5-turbo',
+    openaiLightModel = 'gpt-4o-mini',
+    openaiHeavyModel = 'gpt-4o',
     openaiModelTemperature = '0.0',
     openaiRetries = '3',
     openaiTimeoutMS = '120000',
@@ -146,7 +146,7 @@ export class OpenAIOptions {
   model: string
   tokenLimits: TokenLimits
 
-  constructor(model = 'gpt-3.5-turbo', tokenLimits: TokenLimits | null = null) {
+  constructor(model = 'gpt-4o-mini', tokenLimits: TokenLimits | null = null) {
     this.model = model
     if (tokenLimits != null) {
       this.tokenLimits = tokenLimits

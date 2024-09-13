@@ -33,9 +33,8 @@ Current date: ${currentDate}
 IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
 `
 
-      this.api = new ChatGPTAPI({
+      const apiConfig: any = {
         apiBaseUrl: options.apiBaseUrl,
-        systemMessage,
         apiKey: process.env.OPENAI_API_KEY,
         apiOrg: process.env.OPENAI_API_ORG ?? undefined,
         debug: options.debug,
@@ -45,7 +44,13 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
           temperature: options.openaiModelTemperature,
           model: openaiOptions.model
         }
-      })
+      }
+
+      if (!openaiOptions.model.startsWith('o1')) {
+        apiConfig.systemMessage = systemMessage
+      }
+
+      this.api = new ChatGPTAPI(apiConfig)
     } else {
       const err =
         "Unable to initialize the OpenAI API, both 'OPENAI_API_KEY' environment variable are not available"
