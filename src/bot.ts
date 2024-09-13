@@ -48,6 +48,7 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
 
       if (!openaiOptions.model.startsWith('o1')) {
         apiConfig.systemMessage = systemMessage
+        apiConfig.completionParams.temperature = 1
       }
 
       this.api = new ChatGPTAPI(apiConfig)
