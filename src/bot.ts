@@ -41,14 +41,14 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
         maxModelTokens: openaiOptions.tokenLimits.maxTokens,
         maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
         completionParams: {
-          temperature: options.openaiModelTemperature,
+          temperature: 1,
           model: openaiOptions.model
         }
       }
 
       if (!openaiOptions.model.startsWith('o1')) {
         apiConfig.systemMessage = systemMessage
-        apiConfig.completionParams.temperature = 1
+        apiConfig.completionParams.temperature = options.openaiModelTemperature
       }
 
       this.api = new ChatGPTAPI(apiConfig)
