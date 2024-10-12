@@ -1,15 +1,9 @@
 import './fetch-polyfill'
 
-import {info, setFailed, warning} from '@actions/core'
-import {
-  ChatGPTAPI,
-  ChatGPTError,
-  ChatMessage,
-  SendMessageOptions
-  // eslint-disable-next-line import/no-unresolved
-} from 'chatgpt'
+import Anthropic from "@anthropic-ai/sdk";
+import {info, warning} from '@actions/core'
 import pRetry from 'p-retry'
-import {OpenAIOptions, Options} from './options'
+import {AnthropicOptions, Options} from './options'
 
 // define type to save parentMessageId and conversationId
 export interface Ids {
@@ -18,63 +12,31 @@ export interface Ids {
 }
 
 export class Bot {
-  private readonly api: ChatGPTAPI | null = null // not free
+  private readonly client: Anthropic
 
   private readonly options: Options
+  private readonly anthropicOptions: AnthropicOptions
 
-  constructor(options: Options, openaiOptions: OpenAIOptions) {
+  constructor(options: Options, anthropicOptions: AnthropicOptions) {
     this.options = options
-    if (process.env.OPENAI_API_KEY) {
-      const currentDate = new Date().toISOString().split('T')[0]
-      const systemMessage = `${options.systemMessage} 
-Knowledge cutoff: ${openaiOptions.tokenLimits.knowledgeCutOff}
-Current date: ${currentDate}
-
-IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
-`
-
-      const apiConfig: any = {
-        apiBaseUrl: options.apiBaseUrl,
-        apiKey: process.env.OPENAI_API_KEY,
-        apiOrg: process.env.OPENAI_API_ORG ?? undefined,
-        debug: options.debug,
-        maxModelTokens: openaiOptions.tokenLimits.maxTokens,
-        maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
-        completionParams: {
-          temperature: 1,
-          model: openaiOptions.model
-        }
-      }
-
-      if (!openaiOptions.model.startsWith('o1')) {
-        apiConfig.systemMessage = systemMessage
-        apiConfig.completionParams.temperature = options.openaiModelTemperature
-      }
-
-      this.api = new ChatGPTAPI(apiConfig)
-    } else {
-      const err =
-        "Unable to initialize the OpenAI API, both 'OPENAI_API_KEY' environment variable are not available"
-      throw new Error(err)
-    }
+    this.anthropicOptions = anthropicOptions
+    this.client = new Anthropic();
   }
 
-  chat = async (message: string, ids: Ids): Promise<[string, Ids]> => {
+  chat = async (message: string, prefix?: string): Promise<[string, Ids]> => {
     let res: [string, Ids] = ['', {}]
     try {
-      res = await this.chat_(message, ids)
+      res = await this.chat_(message, prefix)
       return res
     } catch (e: unknown) {
-      if (e instanceof ChatGPTError) {
-        warning(`Failed to chat: ${e}, backtrace: ${e.stack}`)
-      }
+      warning(`Failed to chat: ${e}`)
       return res
     }
   }
 
   private readonly chat_ = async (
     message: string,
-    ids: Ids
+    prefix: string = ''
   ): Promise<[string, Ids]> => {
     // record timing
     const start = Date.now()
@@ -82,53 +44,60 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       return ['', {}]
     }
 
-    let response: ChatMessage | undefined
+    let response: Anthropic.Message | undefined
 
-    if (this.api != null) {
-      const opts: SendMessageOptions = {
-        timeoutMs: this.options.openaiTimeoutMS
+    try {
+      if (this.options.debug) {
+        info(`sending prompt: ${message}\n------------`)
       }
-      if (ids.parentMessageId) {
-        opts.parentMessageId = ids.parentMessageId
-      }
-      try {
-        response = await pRetry(() => this.api!.sendMessage(message, opts), {
-          retries: this.options.openaiRetries
-        })
-      } catch (e: unknown) {
-        if (e instanceof ChatGPTError) {
-          info(
-            `response: ${response}, failed to send message to openai: ${e}, backtrace: ${e.stack}`
-          )
+      response = await pRetry(
+        () =>
+          this.client.messages.create({
+              model: this.anthropicOptions.model,
+              max_tokens: 4096,
+              messages: [
+                {
+                  role: 'user' as 'user',
+                  content: message
+                },
+                ...(prefix
+                  ? [
+                      {
+                        role: 'assistant' as 'assistant',
+                        content: prefix
+                      }
+                    ]
+                  : [])
+              ]
+            }),
+        {
+          retries: this.options.anthropicRetries
         }
-      }
-      const end = Date.now()
-      info(`response: ${JSON.stringify(response)}`)
-      info(
-        `openai sendMessage (including retries) response time: ${
-          end - start
-        } ms`
       )
-    } else {
-      setFailed('The OpenAI API is not initialized')
+    } catch (e: unknown) {
+      info(`response: ${response}, failed to send message to anthropic: ${e}`)
     }
+    const end = Date.now()
+    info(
+      `anthropic sendMessage (including retries) response time: ${end - start} ms`
+    )
+
     let responseText = ''
     if (response != null) {
-      responseText = response.text
+      const responseBody = (response as unknown as { body: any }).body;
+      responseText = JSON.parse(Buffer.from(responseBody).toString('utf-8'))
+        .content?.[0]?.text
     } else {
-      warning('openai response is null')
-    }
-    // remove the prefix "with " in the response
-    if (responseText.startsWith('with ')) {
-      responseText = responseText.substring(5)
+      warning('anthropic response is null')
     }
     if (this.options.debug) {
-      info(`openai responses: ${responseText}`)
+      info(`anthropic responses: ${responseText}\n-----------`)
     }
+    const responseWithMetadata = response as unknown as { $metadata: { requestId: string, cfId: string } };
     const newIds: Ids = {
-      parentMessageId: response?.id,
-      conversationId: response?.conversationId
+      parentMessageId: responseWithMetadata?.$metadata.requestId,
+      conversationId: responseWithMetadata?.$metadata.cfId
     }
-    return [responseText, newIds]
+    return [prefix + responseText, newIds]
   }
 }
