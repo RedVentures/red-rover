@@ -55,18 +55,18 @@ export class Bot {
         max_tokens: 4096,
         messages: [
           {
-            role: 'user' as 'user',
+            role: 'user',
             content: message
           },
           ...(prefix
             ? [
                 {
-                  role: 'assistant' as 'assistant',
+                  role: 'assistant',
                   content: prefix
-                }
+                } as const
               ]
             : [])
-        ]
+        ],
       };
       response = await pRetry(
         () =>
@@ -92,13 +92,19 @@ export class Bot {
       
       if (Array.isArray(response.content) && response.content.length > 0) {
         const textContent = response.content.find(item => item.type === 'text');
-        if (textContent && typeof textContent.text === 'string') {
+        if (textContent && 'text' in textContent) {
           responseText = textContent.text;
         } else {
           warning('No text content found in the response');
         }
       } else {
-        warning('Unexpected content structure in the response');
+        warning(`Unexpected content structure in the response: ${JSON.stringify(response.content)}`);
+      }
+
+      if (responseText) {
+        info(`Response text: ${responseText.substring(0, 100)}...`); // Log the first 100 characters of the response
+      } else {
+        warning('Response text is empty');
       }
 
       newIds.parentMessageId = response.id;
