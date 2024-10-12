@@ -6029,7 +6029,7 @@ class Bot {
                             }
                         ]
                         : [])
-                ]
+                ],
             };
             response = await pRetry(() => this.client.messages.create(params), {
                 retries: this.options.anthropicRetries
@@ -6045,37 +6045,33 @@ class Bot {
         if (response != null) {
             (0,core.info)(`Response type: ${typeof response}`);
             (0,core.info)(`Response keys: ${Object.keys(response).join(', ')}`);
-            try {
-                const responseBody = response.body;
-                if (responseBody === undefined) {
-                    (0,core.warning)('Response body is undefined');
-                    return ['', newIds]; // Return early with empty response
-                }
-                if (typeof responseBody === 'string') {
-                    responseText = JSON.parse(responseBody).content?.[0]?.text || '';
-                }
-                else if (responseBody instanceof Buffer) {
-                    responseText = JSON.parse(responseBody.toString('utf-8')).content?.[0]?.text || '';
+            (0,core.info)(`Response: ${JSON.stringify(response)}`);
+            if (Array.isArray(response.content) && response.content.length > 0) {
+                const textContent = response.content.find(item => item.type === 'text');
+                if (textContent && 'text' in textContent) {
+                    responseText = textContent.text;
                 }
                 else {
-                    (0,core.warning)(`Unexpected response body type: ${typeof responseBody}`);
-                    return ['', newIds]; // Return early with empty response
+                    (0,core.warning)('No text content found in the response');
                 }
             }
-            catch (parseError) {
-                (0,core.warning)(`Failed to parse response: ${parseError}`);
-                return ['', newIds]; // Return early with empty response
+            else {
+                (0,core.warning)(`Unexpected content structure in the response: ${JSON.stringify(response.content)}`);
             }
+            if (responseText) {
+                (0,core.info)(`Response text: ${responseText.substring(0, 100)}...`); // Log the first 100 characters of the response
+            }
+            else {
+                (0,core.warning)('Response text is empty');
+            }
+            newIds.parentMessageId = response.id;
         }
         else {
             (0,core.warning)('Anthropic response is null');
         }
         if (this.options.debug) {
-            (0,core.info)(`Anthropic response: ${responseText}\n-----------`);
+            (0,core.info)(`Anthropic response text: ${responseText}\n-----------`);
         }
-        const responseWithMetadata = response;
-        newIds.parentMessageId = responseWithMetadata?.$metadata?.requestId;
-        newIds.conversationId = responseWithMetadata?.$metadata?.cfId;
         return [prefix + responseText, newIds];
     };
 }
