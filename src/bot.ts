@@ -89,6 +89,7 @@ export class Bot {
     if (response != null) {
       info(`Response type: ${typeof response}`);
       info(`Response keys: ${Object.keys(response).join(', ')}`);
+      info(`Response: ${JSON.stringify(response)}`);
       
       if (Array.isArray(response.content) && response.content.length > 0) {
         const textContent = response.content.find(item => item.type === 'text');
