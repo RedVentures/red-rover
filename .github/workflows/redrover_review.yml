@@ -25,7 +25,7 @@ jobs:
       - name: Read file
         id: file
         run: echo "::set-output name=content::$(cat red_rover/custom_prompt.txt)"
-      - uses: RedVentures/red-rover@anthropic-alpha-1
+      - uses: RedVentures/red-rover@anthropic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
