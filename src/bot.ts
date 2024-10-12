@@ -50,26 +50,27 @@ export class Bot {
       if (this.options.debug) {
         info(`sending prompt: ${message}\n------------`)
       }
+      const params: Anthropic.MessageCreateParams = {
+        model: this.anthropicOptions.model,
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user' as 'user',
+            content: message
+          },
+          ...(prefix
+            ? [
+                {
+                  role: 'assistant' as 'assistant',
+                  content: prefix
+                }
+              ]
+            : [])
+        ]
+      };
       response = await pRetry(
         () =>
-          this.client.messages.create({
-              model: this.anthropicOptions.model,
-              max_tokens: 4096,
-              messages: [
-                {
-                  role: 'user' as 'user',
-                  content: message
-                },
-                ...(prefix
-                  ? [
-                      {
-                        role: 'assistant' as 'assistant',
-                        content: prefix
-                      }
-                    ]
-                  : [])
-              ]
-            }),
+          this.client.messages.create(params),
         {
           retries: this.options.anthropicRetries
         }
@@ -83,21 +84,41 @@ export class Bot {
     )
 
     let responseText = ''
+    const newIds: Ids = {};
+
     if (response != null) {
-      const responseBody = (response as unknown as { body: any }).body;
-      responseText = JSON.parse(Buffer.from(responseBody).toString('utf-8'))
-        .content?.[0]?.text
+      info(`Response type: ${typeof response}`);
+      info(`Response keys: ${Object.keys(response).join(', ')}`);
+      try {
+        const responseBody = (response as unknown as { body: any }).body;
+        if (responseBody === undefined) {
+          warning('Response body is undefined');
+          return ['', newIds]; // Return early with empty response
+        }
+        
+        if (typeof responseBody === 'string') {
+          responseText = JSON.parse(responseBody).content?.[0]?.text || '';
+        } else if (responseBody instanceof Buffer) {
+          responseText = JSON.parse(responseBody.toString('utf-8')).content?.[0]?.text || '';
+        } else {
+          warning(`Unexpected response body type: ${typeof responseBody}`);
+          return ['', newIds]; // Return early with empty response
+        }
+      } catch (parseError) {
+        warning(`Failed to parse response: ${parseError}`);
+        return ['', newIds]; // Return early with empty response
+      }
     } else {
-      warning('anthropic response is null')
+      warning('Anthropic response is null');
     }
+
     if (this.options.debug) {
-      info(`anthropic responses: ${responseText}\n-----------`)
+      info(`Anthropic response: ${responseText}\n-----------`);
     }
+
     const responseWithMetadata = response as unknown as { $metadata: { requestId: string, cfId: string } };
-    const newIds: Ids = {
-      parentMessageId: responseWithMetadata?.$metadata.requestId,
-      conversationId: responseWithMetadata?.$metadata.cfId
-    }
+    newIds.parentMessageId = responseWithMetadata?.$metadata?.requestId;
+    newIds.conversationId = responseWithMetadata?.$metadata?.cfId;
     return [prefix + responseText, newIds]
   }
 }
