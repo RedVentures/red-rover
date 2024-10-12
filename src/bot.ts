@@ -89,36 +89,27 @@ export class Bot {
     if (response != null) {
       info(`Response type: ${typeof response}`);
       info(`Response keys: ${Object.keys(response).join(', ')}`);
-      try {
-        const responseBody = (response as unknown as { body: any }).body;
-        if (responseBody === undefined) {
-          warning('Response body is undefined');
-          return ['', newIds]; // Return early with empty response
-        }
-        
-        if (typeof responseBody === 'string') {
-          responseText = JSON.parse(responseBody).content?.[0]?.text || '';
-        } else if (responseBody instanceof Buffer) {
-          responseText = JSON.parse(responseBody.toString('utf-8')).content?.[0]?.text || '';
+      
+      if (Array.isArray(response.content) && response.content.length > 0) {
+        const textContent = response.content.find(item => item.type === 'text');
+        if (textContent && typeof textContent.text === 'string') {
+          responseText = textContent.text;
         } else {
-          warning(`Unexpected response body type: ${typeof responseBody}`);
-          return ['', newIds]; // Return early with empty response
+          warning('No text content found in the response');
         }
-      } catch (parseError) {
-        warning(`Failed to parse response: ${parseError}`);
-        return ['', newIds]; // Return early with empty response
+      } else {
+        warning('Unexpected content structure in the response');
       }
+
+      newIds.parentMessageId = response.id;
     } else {
       warning('Anthropic response is null');
     }
 
     if (this.options.debug) {
-      info(`Anthropic response: ${responseText}\n-----------`);
+      info(`Anthropic response text: ${responseText}\n-----------`);
     }
 
-    const responseWithMetadata = response as unknown as { $metadata: { requestId: string, cfId: string } };
-    newIds.parentMessageId = responseWithMetadata?.$metadata?.requestId;
-    newIds.conversationId = responseWithMetadata?.$metadata?.cfId;
     return [prefix + responseText, newIds]
   }
 }
