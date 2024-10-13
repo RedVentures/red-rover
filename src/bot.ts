@@ -99,32 +99,32 @@ export class Bot {
           // Trim leading and trailing whitespace
           responseText = responseText.trim();
           
-          try {
-            // Attempt to parse the JSON content
-            let parsedContent;
+          // try {
+          //   // Attempt to parse the JSON content
+          //   let parsedContent;
             
-            // First, try to parse it as a regular JSON
-            try {
-              parsedContent = JSON.parse(responseText);
-            } catch {
-              // If that fails, try to parse it as a nested JSON string
-              parsedContent = JSON.parse(JSON.parse(`"${responseText.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`));
-            }
+          //   // First, try to parse it as a regular JSON
+          //   try {
+          //     parsedContent = JSON.parse(responseText);
+          //   } catch {
+          //     // If that fails, try to parse it as a nested JSON string
+          //     parsedContent = JSON.parse(JSON.parse(`"${responseText.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`));
+          //   }
             
-            // Ensure the structure is correct
-            if (!parsedContent.reviews) {
-              if (parsedContent.reviews) {
-                parsedContent = { reviews: parsedContent.reviews, lgtm: false };
-              } else {
-                parsedContent = { reviews: [{ comment: responseText }], lgtm: false };
-              }
-            }
+          //   // Ensure the structure is correct
+          //   if (!parsedContent.reviews) {
+          //     if (parsedContent.reviews) {
+          //       parsedContent = { reviews: parsedContent.reviews, lgtm: false };
+          //     } else {
+          //       parsedContent = { reviews: [{ comment: responseText }], lgtm: false };
+          //     }
+          //   }
             
-            responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
-          } catch (parseError) {
-            warning(`Response is not in JSON format: ${parseError}`);
-            info(`Raw Response Text: ${responseText}`);
-          }
+          //   responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
+          // } catch (parseError) {
+          //   warning(`Response is not in JSON format: ${parseError}`);
+          //   info(`Raw Response Text: ${responseText}`);
+          // }
         } else {
           warning('No text content found in the response');
         }
