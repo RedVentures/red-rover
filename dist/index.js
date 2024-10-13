@@ -6072,15 +6072,6 @@ class Bot {
                     catch (parseError) {
                         (0,core.warning)(`Failed to parse response as JSON: ${parseError}`);
                         (0,core.info)(`Raw Response Text: ${responseText}`);
-                        // If parsing fails, wrap the entire response in a JSON structure
-                        responseText = JSON.stringify({
-                            reviews: [{
-                                    line_start: 0,
-                                    line_end: 0,
-                                    comment: responseText
-                                }],
-                            lgtm: false
-                        }, null, 2);
                     }
                 }
                 else {
