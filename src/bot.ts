@@ -102,10 +102,36 @@ export class Bot {
           if (responseText.startsWith('"reviews":')) {
             responseText = `{${responseText}`;
           }
-          // Replace any control characters with their escaped Unicode representations
-          responseText = responseText.replace(/[\u0000-\u001F\u007F-\u009F]/g, 
-            char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
-
+          
+          // Replace escaped newlines with actual newlines
+          responseText = responseText.replace(/\\u000a/g, '\n');
+          
+          try {
+            // Attempt to parse the JSON content
+            const parsedContent = JSON.parse(responseText);
+            
+            // Ensure the structure is correct
+            if (!parsedContent.reviews) {
+              parsedContent.reviews = [];
+            }
+            if (typeof parsedContent.lgtm === 'undefined') {
+              parsedContent.lgtm = false;
+            }
+            
+            responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
+          } catch (parseError) {
+            warning(`Failed to parse response as JSON: ${parseError}`);
+            info(`Raw Response Text: ${responseText}`);
+            // If parsing fails, wrap the entire response in a JSON structure
+            responseText = JSON.stringify({
+              reviews: [{
+                line_start: 0,
+                line_end: 0,
+                comment: responseText
+              }],
+              lgtm: false
+            }, null, 2);
+          }
         } else {
           warning('No text content found in the response');
         }
