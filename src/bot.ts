@@ -89,7 +89,7 @@ export class Bot {
     if (response != null) {
       info(`Response type: ${typeof response}`);
       info(`Response keys: ${Object.keys(response).join(', ')}`);
-      info(`Response: ${JSON.stringify(response)}`);
+      //info(`Response: ${JSON.stringify(response)}`);
       
       if (Array.isArray(response.content) && response.content.length > 0) {
         const textContent = response.content.find(item => item.type === 'text');
@@ -123,28 +123,13 @@ export class Bot {
             responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
           } catch (parseError) {
             warning(`Response is not in JSON format: ${parseError}`);
-            // If parsing fails, we'll keep the original trimmed responseText
-            // and wrap it in a JSON structure
-            responseText = JSON.stringify({
-              reviews: [{
-                line_start: 0,
-                line_end: 0,
-                comment: responseText
-              }],
-              lgtm: false
-            }, null, 2);
+            info(`Raw Response Text: ${responseText}`);
           }
         } else {
           warning('No text content found in the response');
         }
       } else {
         warning(`Unexpected content structure in the response: ${JSON.stringify(response.content)}`);
-      }
-
-      if (responseText) {
-        info(`Response text: ${responseText.substring(0, 100)}...`); // Log the first 100 characters of the response
-      } else {
-        warning('Response text is empty');
       }
 
       newIds.parentMessageId = response.id;
@@ -156,6 +141,6 @@ export class Bot {
       info(`Anthropic response text: ${responseText}\n-----------`);
     }
 
-    return [prefix + responseText, newIds]
+    return [responseText, newIds]
   }
 }

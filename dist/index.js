@@ -6045,7 +6045,7 @@ class Bot {
         if (response != null) {
             (0,core.info)(`Response type: ${typeof response}`);
             (0,core.info)(`Response keys: ${Object.keys(response).join(', ')}`);
-            (0,core.info)(`Response: ${JSON.stringify(response)}`);
+            //info(`Response: ${JSON.stringify(response)}`);
             if (Array.isArray(response.content) && response.content.length > 0) {
                 const textContent = response.content.find(item => item.type === 'text');
                 if (textContent && 'text' in textContent) {
@@ -6076,16 +6076,7 @@ class Bot {
                     }
                     catch (parseError) {
                         (0,core.warning)(`Response is not in JSON format: ${parseError}`);
-                        // If parsing fails, we'll keep the original trimmed responseText
-                        // and wrap it in a JSON structure
-                        responseText = JSON.stringify({
-                            reviews: [{
-                                    line_start: 0,
-                                    line_end: 0,
-                                    comment: responseText
-                                }],
-                            lgtm: false
-                        }, null, 2);
+                        (0,core.info)(`Raw Response Text: ${responseText}`);
                     }
                 }
                 else {
@@ -6095,12 +6086,6 @@ class Bot {
             else {
                 (0,core.warning)(`Unexpected content structure in the response: ${JSON.stringify(response.content)}`);
             }
-            if (responseText) {
-                (0,core.info)(`Response text: ${responseText.substring(0, 100)}...`); // Log the first 100 characters of the response
-            }
-            else {
-                (0,core.warning)('Response text is empty');
-            }
             newIds.parentMessageId = response.id;
         }
         else {
@@ -6109,7 +6094,7 @@ class Bot {
         if (this.options.debug) {
             (0,core.info)(`Anthropic response text: ${responseText}\n-----------`);
         }
-        return [prefix + responseText, newIds];
+        return [responseText, newIds];
     };
 }
 
