@@ -6052,6 +6052,10 @@ class Bot {
                     responseText = textContent.text;
                     // Trim leading and trailing whitespace
                     responseText = responseText.trim();
+                    // Check if the response starts with "reviews":
+                    if (responseText.startsWith('"reviews":')) {
+                        responseText = `{${responseText}}`;
+                    }
                     try {
                         // Attempt to parse the JSON content
                         const parsedContent = JSON.parse(responseText);
