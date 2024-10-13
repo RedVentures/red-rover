@@ -6055,6 +6055,8 @@ class Bot {
                     if (responseText.startsWith('"reviews":')) {
                         responseText = `{${responseText}`;
                     }
+                    // Replace any control characters with their escaped Unicode representations
+                    responseText = responseText.replace(/[\u0000-\u001F\u007F-\u009F]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
                 }
                 else {
                     (0,core.warning)('No text content found in the response');
