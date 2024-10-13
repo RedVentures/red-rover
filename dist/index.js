@@ -6050,16 +6050,16 @@ class Bot {
                 const textContent = response.content.find(item => item.type === 'text');
                 if (textContent && 'text' in textContent) {
                     responseText = textContent.text;
-                    // Clean up the response text
-                    responseText = responseText.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                    // Trim leading and trailing whitespace
+                    responseText = responseText.trim();
                     try {
-                        // Parse the JSON content
+                        // Attempt to parse the JSON content
                         const parsedContent = JSON.parse(responseText);
                         responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
                     }
                     catch (parseError) {
                         (0,core.warning)(`Failed to parse response as JSON: ${parseError}`);
-                        // If parsing fails, keep the original responseText
+                        // If parsing fails, we'll keep the original trimmed responseText
                     }
                 }
                 else {
