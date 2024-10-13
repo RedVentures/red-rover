@@ -104,8 +104,17 @@ export class Bot {
             const parsedContent = JSON.parse(responseText);
             responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
           } catch (parseError) {
-            warning(`Failed to parse response as JSON: ${parseError}`);
+            warning(`Response is not in JSON format: ${parseError}`);
             // If parsing fails, we'll keep the original trimmed responseText
+            // and wrap it in a JSON structure
+            responseText = JSON.stringify({
+              reviews: [{
+                line_start: 0,
+                line_end: 0,
+                comment: responseText
+              }],
+              lgtm: false
+            }, null, 2);
           }
         } else {
           warning('No text content found in the response');
