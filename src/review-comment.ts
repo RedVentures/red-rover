@@ -172,7 +172,11 @@ export const handleReviewComment = async (
         }
       }
 
-      const [reply] = await heavyBot.chat(prompts.renderComment(inputs), {})
+      inputs.commentChain = inputs.commentChain
+        .replace(COMMENT_TAG, '')
+        .replace(COMMENT_REPLY_TAG, '')
+
+      const [reply] = await heavyBot.chat(prompts.renderComment(inputs))
 
       await commenter.reviewCommentReply(pullNumber, topLevelComment, reply)
     }

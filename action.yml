@@ -3,7 +3,7 @@ description: 'AI-based PR Reviewer & Summarizer with Chat Capabilities'
 branding:
   icon: 'git-merge'
   color: 'orange'
-author: 'CodeRabbit LLC'
+author: 'gwilkes-rv'
 inputs:
   debug:
     required: false
@@ -148,35 +148,31 @@ inputs:
     required: false
     description: 'Disable release notes'
     default: 'false'
-  openai_base_url:
-    required: false
-    description: 'The url of the openai api interface.'
-    default: 'https://api.openai.com/v1'
-  openai_light_model:
+  anthropic_light_model:
     required: false
     description:
       'Model to use for simple tasks like summarizing diff on a file.'
-    default: 'gpt-4o-mini'
-  openai_heavy_model:
+    default: 'claude-3-haiku-20240307'
+  anthropic_heavy_model:
     required: false
     description: 'Model to use for complex tasks such as code reviews.'
-    default: 'gpt-4o'
-  openai_model_temperature:
+    default: 'claude-3-5-sonnet-20240620'
+  anthropic_model_temperature:
     required: false
     description: 'Temperature for GPT model'
     default: '0.05'
-  openai_retries:
+  anthropic_retries:
     required: false
     description:
-      'How many times to retry OpenAI API in case of timeouts or errors?'
+      'How many times to retry Anthropic API in case of timeouts or errors?'
     default: '5'
-  openai_timeout_ms:
+  anthropic_timeout_ms:
     required: false
-    description: 'Timeout for OpenAI API call in millis'
+    description: 'Timeout for Anthropic API call in millis'
     default: '360000'
-  openai_concurrency_limit:
+  anthropic_concurrency_limit:
     required: false
-    description: 'How many concurrent API calls to make to OpenAI servers?'
+    description: 'How many concurrent API calls to make to Anthropic servers?'
     default: '6'
   github_concurrency_limit:
     required: false
@@ -184,41 +180,34 @@ inputs:
     default: '6'
   system_message:
     required: false
-    description: 'System message to be sent to OpenAI'
+    description: 'System message to be sent to Anthropic'
     default: |
-      You are `@redrover` (aka `github-actions[bot]`), a language model
-      trained by OpenAI. Your purpose is to act as a highly experienced
-      software engineer and provide a thorough review of the code hunks
-      and suggest code snippets to improve key areas such as:
-        - Logic
-        - Security
-        - Performance
-        - Data races
-        - Consistency
-        - Error handling
-        - Maintainability
-        - Modularity
-        - Complexity
-        - Optimization
-        - Best practices: DRY, SOLID, KISS
+      You are `@redrover` (aka `github-actions[bot]`), a language model 
+      trained by Anthropic. Your purpose is to act as a highly experienced 
+      software engineer and provide a thorough review of the code, related documents, and articles
+      and suggest code snippets to improve these with various aspects.
 
-      Do not comment on minor code style issues, missing 
-      comments/documentation. Identify and resolve significant 
-      concerns to improve overall code quality while deliberately 
-      disregarding minor issues.
+      Follow the following instructions.
   summarize:
     required: false
     description: 'The prompt for final summarization response'
     default: |
       Provide your final response in markdown with the following content:
 
-      **Walkthrough**: A high-level summary of the overall change instead of 
-      specific files within 80 words.
-      **Changes**: A markdown table of files and their summaries. Group files 
-      with similar changes together into a single row to save space.
+      - **Walkthrough**: A high-level summary of the overall change instead of 
+        specific files within 80 words.
+      - **Changes**: A markdown table of files and their summaries. Group files 
+        with similar changes together into a single row to save space.
 
       Avoid additional commentary as this summary will be added as a comment on the 
       GitHub pull request. Use the titles "Walkthrough" and "Changes" and they must be H2.
+  review_file_diff:
+    required: false
+    description: 'The additional instruction for reviewing file diff'
+    default: |
+      - Do NOT provide general feedback, summaries, explanations of changes, or praises for making good additions. 
+      - Focus solely on offering specific, objective insights based on the given context and refrain from making broad comments about potential impacts on the system or question intentions behind the changes.
+
   summarize_release_notes:
     required: false
     description:
@@ -248,6 +237,10 @@ inputs:
     required: false
     description: ISO code for the response language
     default: en-US
+  bot_icon:
+    required: false
+    description: 'The icon for Red Rover'
+    default: 🐶
 runs:
   using: 'node20'
   main: 'dist/index.js'

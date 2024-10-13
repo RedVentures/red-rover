@@ -12,16 +12,16 @@ export class Options {
   reviewCommentLGTM: boolean
   pathFilters: PathFilter
   systemMessage: string
-  openaiLightModel: string
-  openaiHeavyModel: string
-  openaiModelTemperature: number
-  openaiRetries: number
-  openaiTimeoutMS: number
-  openaiConcurrencyLimit: number
+  reviewFileDiff: string
+  anthropicLightModel: string
+  anthropicHeavyModel: string
+  anthropicModelTemperature: number
+  anthropicRetries: number
+  anthropicTimeoutMS: number
+  anthropicConcurrencyLimit: number
   githubConcurrencyLimit: number
   lightTokenLimits: TokenLimits
   heavyTokenLimits: TokenLimits
-  apiBaseUrl: string
   language: string
 
   constructor(
@@ -34,14 +34,14 @@ export class Options {
     reviewCommentLGTM = false,
     pathFilters: string[] | null = null,
     systemMessage = '',
-    openaiLightModel = 'gpt-4o-mini',
-    openaiHeavyModel = 'gpt-4o',
-    openaiModelTemperature = '0.0',
-    openaiRetries = '3',
-    openaiTimeoutMS = '120000',
-    openaiConcurrencyLimit = '6',
+    reviewFileDiff = '',
+    anthropicLightModel: string,
+    anthropicHeavyModel: string,
+    anthropicModelTemperature = '0.0',
+    anthropicRetries = '3',
+    anthropicTimeoutMS = '120000',
+    anthropicConcurrencyLimit = '6',
     githubConcurrencyLimit = '6',
-    apiBaseUrl = 'https://api.openai.com/v1',
     language = 'en-US'
   ) {
     this.debug = debug
@@ -53,16 +53,16 @@ export class Options {
     this.reviewCommentLGTM = reviewCommentLGTM
     this.pathFilters = new PathFilter(pathFilters)
     this.systemMessage = systemMessage
-    this.openaiLightModel = openaiLightModel
-    this.openaiHeavyModel = openaiHeavyModel
-    this.openaiModelTemperature = parseFloat(openaiModelTemperature)
-    this.openaiRetries = parseInt(openaiRetries)
-    this.openaiTimeoutMS = parseInt(openaiTimeoutMS)
-    this.openaiConcurrencyLimit = parseInt(openaiConcurrencyLimit)
+    this.reviewFileDiff = reviewFileDiff
+    this.anthropicLightModel = anthropicLightModel
+    this.anthropicHeavyModel = anthropicHeavyModel
+    this.anthropicModelTemperature = parseFloat(anthropicModelTemperature)
+    this.anthropicRetries = parseInt(anthropicRetries)
+    this.anthropicTimeoutMS = parseInt(anthropicTimeoutMS)
+    this.anthropicConcurrencyLimit = parseInt(anthropicConcurrencyLimit)
     this.githubConcurrencyLimit = parseInt(githubConcurrencyLimit)
-    this.lightTokenLimits = new TokenLimits(openaiLightModel)
-    this.heavyTokenLimits = new TokenLimits(openaiHeavyModel)
-    this.apiBaseUrl = apiBaseUrl
+    this.lightTokenLimits = new TokenLimits(anthropicLightModel)
+    this.heavyTokenLimits = new TokenLimits(anthropicHeavyModel)
     this.language = language
   }
 
@@ -77,16 +77,16 @@ export class Options {
     info(`review_comment_lgtm: ${this.reviewCommentLGTM}`)
     info(`path_filters: ${this.pathFilters}`)
     info(`system_message: ${this.systemMessage}`)
-    info(`openai_light_model: ${this.openaiLightModel}`)
-    info(`openai_heavy_model: ${this.openaiHeavyModel}`)
-    info(`openai_model_temperature: ${this.openaiModelTemperature}`)
-    info(`openai_retries: ${this.openaiRetries}`)
-    info(`openai_timeout_ms: ${this.openaiTimeoutMS}`)
-    info(`openai_concurrency_limit: ${this.openaiConcurrencyLimit}`)
+    info(`review_file_diff: ${this.reviewFileDiff}`)
+    info(`anthropic_light_model: ${this.anthropicLightModel}`)
+    info(`anthropic_heavy_model: ${this.anthropicHeavyModel}`)
+    info(`anthropic_model_temperature: ${this.anthropicModelTemperature}`)
+    info(`anthropic_retries: ${this.anthropicRetries}`)
+    info(`anthropic_timeout_ms: ${this.anthropicTimeoutMS}`)
+    info(`anthropic_concurrency_limit: ${this.anthropicConcurrencyLimit}`)
     info(`github_concurrency_limit: ${this.githubConcurrencyLimit}`)
     info(`summary_token_limits: ${this.lightTokenLimits.string()}`)
     info(`review_token_limits: ${this.heavyTokenLimits.string()}`)
-    info(`api_base_url: ${this.apiBaseUrl}`)
     info(`language: ${this.language}`)
   }
 
@@ -116,6 +116,11 @@ export class PathFilter {
     }
   }
 
+  /**
+   * Returns true if the file should be processed, not ignored.
+   * If there is any inclusion rule set, a file is included when it matches any of inclusion rule.
+   * If there is no inclusion rule set, a file is included when it does not matches any of exclusion rule.
+   */
   check(path: string): boolean {
     if (this.rules.length === 0) {
       return true
@@ -142,11 +147,14 @@ export class PathFilter {
   }
 }
 
-export class OpenAIOptions {
+export class AnthropicOptions {
   model: string
   tokenLimits: TokenLimits
 
-  constructor(model = 'gpt-4o-mini', tokenLimits: TokenLimits | null = null) {
+  constructor(
+    model = 'anthropic.claude-instant-v1',
+    tokenLimits: TokenLimits | null = null
+  ) {
     this.model = model
     if (tokenLimits != null) {
       this.tokenLimits = tokenLimits
