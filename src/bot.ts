@@ -106,7 +106,19 @@ export class Bot {
           
           try {
             // Attempt to parse the JSON content
-            const parsedContent = JSON.parse(responseText);
+            let parsedContent;
+            if (responseText.startsWith('{')) {
+              parsedContent = JSON.parse(responseText);
+            } else {
+              // If it doesn't start with '{', it might be a nested JSON string
+              parsedContent = JSON.parse(JSON.parse(responseText));
+            }
+            
+            // Ensure the structure is correct
+            if (!parsedContent.reviews) {
+              parsedContent = { reviews: parsedContent.reviews || [{ comment: responseText }], lgtm: false };
+            }
+            
             responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
           } catch (parseError) {
             warning(`Response is not in JSON format: ${parseError}`);
