@@ -99,24 +99,25 @@ export class Bot {
           // Trim leading and trailing whitespace
           responseText = responseText.trim();
           
-          // Check if the response starts with "reviews":
-          if (responseText.startsWith('"reviews":')) {
-            responseText = `{${responseText}}`;
-          }
-          
           try {
             // Attempt to parse the JSON content
             let parsedContent;
-            if (responseText.startsWith('{')) {
+            
+            // First, try to parse it as a regular JSON
+            try {
               parsedContent = JSON.parse(responseText);
-            } else {
-              // If it doesn't start with '{', it might be a nested JSON string
-              parsedContent = JSON.parse(JSON.parse(responseText));
+            } catch {
+              // If that fails, try to parse it as a nested JSON string
+              parsedContent = JSON.parse(JSON.parse(`"${responseText.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`));
             }
             
             // Ensure the structure is correct
             if (!parsedContent.reviews) {
-              parsedContent = { reviews: parsedContent.reviews || [{ comment: responseText }], lgtm: false };
+              if (parsedContent.reviews) {
+                parsedContent = { reviews: parsedContent.reviews, lgtm: false };
+              } else {
+                parsedContent = { reviews: [{ comment: responseText }], lgtm: false };
+              }
             }
             
             responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
