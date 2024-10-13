@@ -95,6 +95,18 @@ export class Bot {
         const textContent = response.content.find(item => item.type === 'text');
         if (textContent && 'text' in textContent) {
           responseText = textContent.text;
+          
+          // Clean up the response text
+          responseText = responseText.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+          
+          try {
+            // Parse the JSON content
+            const parsedContent = JSON.parse(responseText);
+            responseText = JSON.stringify(parsedContent, null, 2); // Pretty print the JSON
+          } catch (parseError) {
+            warning(`Failed to parse response as JSON: ${parseError}`);
+            // If parsing fails, keep the original responseText
+          }
         } else {
           warning('No text content found in the response');
         }
