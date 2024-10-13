@@ -1,15 +1,18 @@
 <h1><img align="center" height="60" src="https://github.com/user-attachments/assets/84111c2e-fe44-4de1-b82d-45f38199724a">  &nbsp;&nbsp;Red Rover</h1>
 
-<br/>
-
-## Overview
+### Overview
 
 RedRover is an AI-based code reviewer and summarizer for
 GitHub pull requests using Anthropic models. It is
 designed to be used as a GitHub Action and can be configured to run on every
 pull request and review comments
 
-## Reviewer Features:
+To use this tool, you need to add the provided YAML file to your repository and
+configure the required environment variables, such as `GITHUB_TOKEN` and
+`ANTHROPIC_API_KEY`. For more information on usage, examples, and development
+you can refer to the sections below.
+
+### Reviewer Features:
 
 - **PR Summarization**: It generates a summary and release notes of the changes
   in the pull request.
@@ -37,18 +40,6 @@ pull request and review comments
 - **Customizable prompts**: Tailor the `system_message`, `summarize`, and
   `summarize_release_notes` prompts to focus on specific aspects of the review
   process or even change the review objective.
-
-To use this tool, you need to add the provided YAML file to your repository and
-configure the required environment variables, such as `GITHUB_TOKEN` and
-`ANTHROPIC_API_KEY`. For more information on usage, examples, and development
-you can refer to the sections below.
-
-- [Overview](#overview)
-- [Reviewer Features](#reviewer-features)
-- [Install instructions](#install-instructions)
-- [Conversation with RedRover(#conversation-with-RedRover)
-- [Examples](#examples)
-- [Developing](#developing)
 
 ## Install instructions
 
