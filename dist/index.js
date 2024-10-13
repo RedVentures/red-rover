@@ -6053,7 +6053,7 @@ class Bot {
                     responseText = responseText.trim();
                     // Check if the response starts with "reviews":
                     if (responseText.startsWith('"reviews":')) {
-                        responseText = `{${responseText}}`;
+                        responseText = `{${responseText}`;
                     }
                 }
                 else {

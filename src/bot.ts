@@ -100,7 +100,7 @@ export class Bot {
           
           // Check if the response starts with "reviews":
           if (responseText.startsWith('"reviews":')) {
-            responseText = `{${responseText}}`;
+            responseText = `{${responseText}`;
           }
         } else {
           warning('No text content found in the response');
