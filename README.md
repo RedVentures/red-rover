@@ -1,15 +1,18 @@
-# RedRover - An OpenAI ChatGPT-based PR reviewer and summarizer
+<h1><img align="center" height="60" src="https://github.com/user-attachments/assets/84111c2e-fe44-4de1-b82d-45f38199724a">  &nbsp;&nbsp;Red Rover</h1>
 
-![small-red-rover](https://github.com/bankrate/red-rover/assets/64108082/9ee5df3f-bc3f-4bfc-878e-171d7ccca96e)
-
-## Overview
+### Overview
 
 RedRover is an AI-based code reviewer and summarizer for
-GitHub pull requests using OpenAI's `gpt-3.5-turbo` and `gpt-4` models. It is
+GitHub pull requests using Anthropic models. It is
 designed to be used as a GitHub Action and can be configured to run on every
 pull request and review comments
 
-## Reviewer Features:
+To use this tool, you need to add the provided YAML file to your repository and
+configure the required environment variables, such as `GITHUB_TOKEN` and
+`ANTHROPIC_API_KEY`. For more information on usage, examples, and development
+you can refer to the sections below.
+
+### Reviewer Features:
 
 - **PR Summarization**: It generates a summary and release notes of the changes
   in the pull request.
@@ -18,13 +21,11 @@ pull request and review comments
 - **Continuous, incremental reviews**: Reviews are performed on each commit
   within a pull request, rather than a one-time review on the entire pull
   request.
-- **Cost-effective and reduced noise**: Incremental reviews save on OpenAI costs
+- **Cost-effective and reduced noise**: Incremental reviews save on Anthropic costs
   and reduce noise by tracking changed files between commits and the base of the
   pull request.
 - **"Light" model for summary**: Designed to be used with a "light"
-  summarization model (e.g. `gpt-3.5-turbo`) and a "heavy" review model (e.g.
-  `gpt-4`). _For best results, use `gpt-4` as the "heavy" model, as thorough
-  code review needs strong reasoning abilities._
+  summarization model and a "heavy" review model.
 - **Chat with bot**: Supports conversation with the bot in the context of lines
   of code or entire files, useful for providing context, generating test cases,
   and reducing code complexity.
@@ -39,19 +40,6 @@ pull request and review comments
 - **Customizable prompts**: Tailor the `system_message`, `summarize`, and
   `summarize_release_notes` prompts to focus on specific aspects of the review
   process or even change the review objective.
-
-To use this tool, you need to add the provided YAML file to your repository and
-configure the required environment variables, such as `GITHUB_TOKEN` and
-`OPENAI_API_KEY`. For more information on usage, examples, and development 
-you can refer to the sections below.
-
-- [Overview](#overview)
-- [Professional Version of RedRover](#professional-version-of-RedRover)
-- [Reviewer Features](#reviewer-features)
-- [Install instructions](#install-instructions)
-- [Conversation with RedRover](#conversation-with-RedRover)
-- [Examples](#examples)
-- [Developing](#developing)
 
 ## Install instructions
 
@@ -81,10 +69,10 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: RedVentures/red-rover@latest
+      - uses: RedVentures/red-rover@anthropic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
           debug: false
           review_simple_changes: false
@@ -95,22 +83,9 @@ jobs:
 
 - `GITHUB_TOKEN`: This should already be available to the GitHub Action
   environment. This is used to add comments to the pull request.
-- `OPENAI_API_KEY`: use this to authenticate with OpenAI API. You can get one
-  [here](https://platform.openai.com/account/api-keys). Please add this key to
+- `ANTHROPIC_API_KEY`: use this to authenticate with Anthropic API. You can get one
+  [here](https://console.anthropic.com/settings/keys). Please add this key to
   your GitHub Action secrets.
-- `OPENAI_API_ORG`: (optional) use this to use the specified organization with
-  OpenAI API if you have multiple. Please add this key to your GitHub Action
-  secrets.
-
-### Models: `gpt-4` and `gpt-3.5-turbo`
-
-Recommend using `gpt-3.5-turbo` for lighter tasks such as summarizing the
-changes (`openai_light_model` in configuration) and `gpt-4` for more complex
-review and commenting tasks (`openai_heavy_model` in configuration).
-
-Costs: `gpt-3.5-turbo` is dirt cheap. `gpt-4` is orders of magnitude more
-expensive, but the results are vastly superior. We are typically spending $20 a
-day for a 20 developer team with `gpt-4` based review and commenting.
 
 ### Prompts & Configuration
 
@@ -206,18 +181,7 @@ Build the typescript and package it for distribution
 $ npm run build && npm run package
 ```
 
-### Inspect the messages between OpenAI server
+### Inspect the messages between Anthropic server
 
 Set `debug: true` in the workflow file to enable debug mode, which will show the
 messages
-
-### Disclaimer
-
-- Your code (files, diff, PR title/description) will be sent to OpenAI's servers
-  for processing. Please check with your compliance team before using this on
-  your private code repositories.
-- OpenAI's API is used instead of ChatGPT session on their portal. OpenAI API
-  has a
-  [more conservative data usage policy](https://openai.com/policies/api-data-usage-policies)
-  compared to their ChatGPT offering.
-- This action is not affiliated with OpenAI.
