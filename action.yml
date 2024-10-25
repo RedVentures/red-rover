@@ -156,7 +156,7 @@ inputs:
   anthropic_heavy_model:
     required: false
     description: 'Model to use for complex tasks such as code reviews.'
-    default: 'claude-3-5-sonnet-20240620'
+    default: 'claude-3-5-sonnet-latest'
   anthropic_model_temperature:
     required: false
     description: 'Temperature for GPT model'
