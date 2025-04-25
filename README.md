@@ -68,11 +68,10 @@ permissions:
 on:
   pull_request:
   pull_request_review_comment:
-    types: [ created ]
+    types: [created]
 
 concurrency:
-  group:
-    ${{ github.repository }}-${{ github.event.number || github.head_ref ||
+  group: ${{ github.repository }}-${{ github.event.number || github.head_ref ||
     github.sha }}-${{ github.workflow }}-${{ github.event_name ==
     'pull_request_review_comment' && 'pr_comment' || 'pr' }}
   cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
@@ -86,9 +85,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
-          debug: false
+          openai_light_model: gpt-4.1-mini
+          openai_heavy_model: gpt-4.1
           review_simple_changes: false
+          less_verbose_review: false
           review_comment_lgtm: false
+          poem_enabled: false
+          debug: false
 ```
 
 #### Environment variables
