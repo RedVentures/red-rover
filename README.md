@@ -36,9 +36,9 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: RedVentures/red-rover@latest
+      - uses: bankrate/red-rover@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BANKRATE_BOT_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # Uncomment if using Anthropic
         with:
