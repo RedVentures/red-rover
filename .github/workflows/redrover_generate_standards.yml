@@ -33,7 +33,7 @@ jobs:
       - name: Generate Standards
         run: python red_rover/generate_standards.py
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BANKRATE_BOT_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_REPO: ${{ github.repository }}
 
